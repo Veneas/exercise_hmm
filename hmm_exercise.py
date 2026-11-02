@@ -96,6 +96,67 @@ class HMM:
         return best_path, best_prob, sum_prob
 
 
+    # Task 02 addition
+    def viterbi(self,x):
+        """
+        Finds the most likely hidden path and its log2 probability using dynamic programming
+        :param x:
+        :return:
+        """
+
+        if not x:
+            return "", -math.inf
+
+        v = []
+        back = []
+
+        # Initalising col 0
+        v.append({})
+        back.append({})
+        for k in self.states:
+            v[0][k] = self.log_pi[k] + self.log_e[k][x[0]]
+            back[0][k] = None
+
+        # Filling the table for positions i>0
+        for i in range(1, len(x)):
+            v.append({})
+            back.append({})
+            for k in self.states:
+                best_score = -math.inf
+                best_prev = None
+
+                # Iteration in self.states order and use > so the
+                # first state naturally wins any exact ties
+                for prev in self.states:
+                    score = v[i-1][prev] + self.log_a[prev][k] + self.log_e[k][x[i]]
+                    if score > best_score:
+                        best_score = score
+                        best_prev = prev
+
+                v[i][k] = best_score
+                back[i][k] = best_prev
+        # Finding the best ending state in the final col
+        best_final_score = -math.inf
+        best_final_state = None
+        for k in self.states:
+            if v[-1][k] > best_final_score:
+                best_final_score = v[-1][k]
+                best_final_state = k
+
+        # Traceback
+        path_list = []
+        curr_state = best_final_state
+        for i in range(len(x) -1, -1, -1):
+            path_list.append(curr_state)
+            curr_state = back[i][curr_state]
+
+        # Reverse, as collection was backwards
+        path_list.reverse()
+        best_path = "".join(path_list)
+
+        return best_path, best_final_score
+
+
 def read_model(path):
     """ Reads a model file and returns HMM instance """
 
@@ -103,10 +164,6 @@ def read_model(path):
         data = json.load(f)
 
     return HMM(data["states"], data["alphabet"], data["pi"], data["a"], data["e"])
-
-
-
-
 
 
 # =-=-=-=-=-=-=-= TASK 2 =-=-=-=-=-=-=-=
@@ -153,5 +210,25 @@ if __name__ == "__main__":
 
     except FileNotFoundError:
         print("File 'weather_model.json' not found in the same directory.")
+
     # =-=-=-=-=-=-=-= TASK 2
+    try:
+        toy = read_model("toy_model.json")
+        seq_toy = "phchc"
+
+        print("Test of Viterbi on 'toy_model.json' with seq 'phchc'")
+        v_path, v_score = toy.viterbi(seq_toy)
+
+        print(f"\nViterbi path:\t{v_path} (exp. SMMMS)")
+        print(f"Viterbi score:\t{v_score:.2f} (exp. -11.87)")
+
+        # Brute force verification
+        bf_path, bf_prob, bf_sum = toy.brute_force(seq_toy)
+        print(f"\nBrute force path matches ? {v_path == bf_path}")
+        print(f"Brute force prob matches? {math.isclose(2**v_score, bf_prob)}")
+        print(f"Log joint matches score? {math.isclose(v_score, toy.log_joint(seq_toy, v_path))}")
+    except FileNotFoundError:
+        print("File 'toy_model.json' not found in the same directory.")
+
+
     # =-=-=-=-=-=-=-= TASK 3
